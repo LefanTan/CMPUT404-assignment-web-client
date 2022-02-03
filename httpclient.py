@@ -18,11 +18,12 @@
 # Write your own HTTP GET and POST
 # The point is to understand what you have to send and get experience with it
 
+from email.policy import HTTP
 import sys
 import socket
 import re
 # you may use urllib to encode data appropriately
-import urllib.parse
+from urllib.parse import urlparse
 
 def help():
     print("httpclient.py [GET/POST] [URL]\n")
@@ -32,25 +33,53 @@ class HTTPResponse(object):
         self.code = code
         self.body = body
 
+    def __str__(self) -> str:
+        return f"{self.code}\r\n{self.body}"
+
 class HTTPClient(object):
-    #def get_host_port(self,url):
+    def prep_url(self, url):
+        if(not url.startswith("http")):
+            url = "//" + url
+        if(not url.endswith("/")):
+            url += "/"
+        return url
 
     def connect(self, host, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((host, port))
+        self.socket.connect((socket.gethostbyname(host), port))
         return None
 
     def get_code(self, data):
-        return None
+        if not data:
+            return
+            
+        first_line = data.split("\n")[0]
+        code = first_line.split()[1]
+        return int(code)
 
     def get_headers(self,data):
-        return None
+        if not data:
+                return
+
+        split = data.split("\r\n\r\n")
+        if(len(split) > 0):
+            return split[0] 
+        return split
 
     def get_body(self, data):
-        return None
+        if not data:
+            return
+
+        split = data.split("\r\n\r\n")
+        if(len(split) > 1):
+            return split[1] 
+        return split
     
     def sendall(self, data):
-        self.socket.sendall(data.encode('utf-8'))
+        try:
+            self.socket.sendall(data.encode('utf-8'))
+        except:
+            print("Send payload fail")
         
     def close(self):
         self.socket.close()
@@ -59,22 +88,70 @@ class HTTPClient(object):
     def recvall(self, sock):
         buffer = bytearray()
         done = False
-        while not done:
-            part = sock.recv(1024)
-            if (part):
-                buffer.extend(part)
-            else:
-                done = not part
+        try:
+            while not done:
+                part = sock.recv(1024)
+                if (part):
+                    buffer.extend(part)
+                else:
+                    done = not part
+        except:
+            print("Error receiving payload")
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
         code = 500
         body = ""
+        
+        url = self.prep_url(url)
+        path = urlparse(url).path
+        host = urlparse(url).hostname
+        port = urlparse(url).port or 80
+
+        self.connect(host, port)
+        self.sendall(f"GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Lefan's Web Client\r\nAccept: *\r\n\r\n")
+
+        self.socket.shutdown(socket.SHUT_WR)
+
+        response = self.recvall(self.socket)
+        self.close()
+
+        body = self.get_body(response)
+        code = self.get_code(response)
+
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
         code = 500
         body = ""
+
+        url = self.prep_url(url)
+        path = urlparse(url).path
+        host = urlparse(url).hostname
+        port = urlparse(url).port or 80
+
+        self.connect(host, port)
+        self.sendall(
+            f"""
+            POST {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Lefan's Web Client
+            \r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n
+            """)
+        
+        parsed_args = ""
+        if args:
+            for key, val in args.items():
+                if(len(parsed_args) > 0):
+                    parsed_args += "&"
+                parsed_args += f"{key}={val}"
+        self.sendall(parsed_args)
+
+        self.socket.shutdown(socket.SHUT_WR)
+        response = self.recvall(self.socket)
+        self.close()
+
+        body = self.get_body(response)
+        code = self.get_code(response)
+
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
@@ -86,6 +163,8 @@ class HTTPClient(object):
 if __name__ == "__main__":
     client = HTTPClient()
     command = "GET"
+
+    # print(client.POST("http://ptsv2.com", {"name": "Lefan"}).body)
     if (len(sys.argv) <= 1):
         help()
         sys.exit(1)

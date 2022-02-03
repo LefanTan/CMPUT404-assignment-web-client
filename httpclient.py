@@ -23,7 +23,7 @@ import sys
 import socket
 import re
 # you may use urllib to encode data appropriately
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 def help():
     print("httpclient.py [GET/POST] [URL]\n")
@@ -40,8 +40,6 @@ class HTTPClient(object):
     def prep_url(self, url):
         if(not url.startswith("http")):
             url = "//" + url
-        if(not url.endswith("/")):
-            url += "/"
         return url
 
     def connect(self, host, port):
@@ -59,7 +57,7 @@ class HTTPClient(object):
 
     def get_headers(self,data):
         if not data:
-                return
+            return
 
         split = data.split("\r\n\r\n")
         if(len(split) > 0):
@@ -78,8 +76,8 @@ class HTTPClient(object):
     def sendall(self, data):
         try:
             self.socket.sendall(data.encode('utf-8'))
-        except:
-            print("Send payload fail")
+        except Exception as e:
+            print("Send payload fail:", e)
         
     def close(self):
         self.socket.close()
@@ -104,15 +102,16 @@ class HTTPClient(object):
         body = ""
         
         url = self.prep_url(url)
-        path = urlparse(url).path
+        path = urlparse(url).path or "/"
         host = urlparse(url).hostname
         port = urlparse(url).port or 80
 
         self.connect(host, port)
-        self.sendall(f"GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Lefan's Web Client\r\nAccept: *\r\n\r\n")
+        
+        request_header = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: curl/7.64.0\r\nAccept: */*\r\nConnection: keep-alive\r\n\r\n"
+        self.sendall(request_header)
 
         self.socket.shutdown(socket.SHUT_WR)
-
         response = self.recvall(self.socket)
         self.close()
 
@@ -126,25 +125,19 @@ class HTTPClient(object):
         body = ""
 
         url = self.prep_url(url)
-        path = urlparse(url).path
+        path = urlparse(url).path or "/"
         host = urlparse(url).hostname
         port = urlparse(url).port or 80
 
-        self.connect(host, port)
-        self.sendall(
-            f"""
-            POST {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Lefan's Web Client
-            \r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n
-            """)
-        
         parsed_args = ""
         if args:
-            for key, val in args.items():
-                if(len(parsed_args) > 0):
-                    parsed_args += "&"
-                parsed_args += f"{key}={val}"
-        self.sendall(parsed_args)
+            parsed_args = urlencode(args)
 
+        self.connect(host, port)
+        request_header = f"""POST {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Lefan's Web Client\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {len(parsed_args)}\r\n\r\n"""
+        self.sendall(request_header)
+        self.sendall(parsed_args)
+        
         self.socket.shutdown(socket.SHUT_WR)
         response = self.recvall(self.socket)
         self.close()
@@ -164,11 +157,11 @@ if __name__ == "__main__":
     client = HTTPClient()
     command = "GET"
 
-    # print(client.POST("http://ptsv2.com", {"name": "Lefan"}).body)
-    if (len(sys.argv) <= 1):
-        help()
-        sys.exit(1)
-    elif (len(sys.argv) == 3):
-        print(client.command( sys.argv[2], sys.argv[1] ))
-    else:
-        print(client.command( sys.argv[1] ))
+    print(client.POST("http://asdf.com", {"as": "LEfan", "a": "lma\ro"}))
+    # if (len(sys.argv) <= 1):
+    #     help()
+    #     sys.exit(1)
+    # elif (len(sys.argv) == 3):
+    #     print(client.command( sys.argv[2], sys.argv[1] ))
+    # else:
+    #     print(client.command( sys.argv[1] ))

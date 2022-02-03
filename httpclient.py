@@ -108,7 +108,7 @@ class HTTPClient(object):
 
         self.connect(host, port)
         
-        request_header = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: curl/7.64.0\r\nAccept: */*\r\nConnection: keep-alive\r\n\r\n"
+        request_header = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Lefan's Web Client\r\nAccept: */*\r\n\r\n"
         self.sendall(request_header)
 
         self.socket.shutdown(socket.SHUT_WR)

@@ -107,7 +107,12 @@ class HTTPClient(object):
         port = urlparse(url).port or 80
 
         self.connect(host, port)
-        
+
+        parsed_args = ""
+        if args:
+            parsed_args = urlencode(args)
+            path = path + "?" + parsed_args
+
         request_header = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Lefan's Web Client\r\nAccept: */*\r\n\r\n"
         self.sendall(request_header)
 
